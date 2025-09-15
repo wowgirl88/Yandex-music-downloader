@@ -25,9 +25,6 @@ BANNER = f"""
 current token: {token[:5]}...
 current directory: {download_dir}
 
-Tip:
-if you use it for first time, try 'help'
-
 [1] download album
 [2] download track
 [3] settings
