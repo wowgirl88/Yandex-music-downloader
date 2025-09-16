@@ -15,20 +15,18 @@ config.read("config.conf")
 token = config.get("token", "oauth_token")
 download_dir = config.get("downloads", "directory")
 
-BANNER = f"""
-┓┏┏┓┳┓┳┓┏┓┏┓┏┓  ┳┳┓┳┳┏┓┳┏┓
-┗┫┣┫┃┃┃┃┣  ┃┃   ┃┃┃┃┃┗┓┃┃
-┗┛┛┗┛┗┻┛┗┛┗┛┗┛  ┛ ┗┗┛┗┛┻┗┛
-┳┓┏┓┓ ┏┳┓┓ ┏┓┏┓┳┓┏┓┳┓
-┃┃┃┃┃┃┃┃┃┃ ┃┃┣┫┃┃┣ ┣┫
-┻┛┗┛┗┻┛┛┗┗┛┗┛┛┗┻┛┗┛┛┗
-current token: {token[:5]}...
-current directory: {download_dir}
+BANNER = rf"""__  ____  _______ 
+\ \/ /  |/  / __ \
+ \  / /|_/ / / / /
+ / / /  / / /_/ / 
+/_/_/  /_/_____/  
 
 [1] download album
 [2] download track
-[3] settings
-[0] exit"""
+[3] search
+[4] settings
+[0] exit
+"""
 
 
 class YandexMusicDownloader:
@@ -59,6 +57,59 @@ class YandexMusicDownloader:
             }
         )
         return session
+
+    def search(self, query, search_type="all"):
+        print(f"[+] Searching for: {query}")
+        url = "https://api.music.yandex.net/search"
+        params = {
+            "text": query,
+            "type": search_type,
+            "page": 0,
+            "nocorrect": False
+        }
+        
+        try:
+            response = self.session.get(url, params=params, timeout=15)
+            if response.status_code != 200:
+                print(f"Search error: {response.status_code}")
+                return None
+
+            data = response.json()
+            return data
+        except Exception as e:
+            print(f"Search error: {e}")
+            return None
+
+    def format_search_results(self, search_data):
+        if not search_data or "result" not in search_data:
+            print("No results found")
+            return
+
+        result = search_data["result"]
+        
+        if "albums" in result and result["albums"]["results"]:
+            print("\nALBUMS:")
+            print(f"{'NAME':<50} {'ID':<10}")
+            print("-" * 60)
+            for album in result["albums"]["results"]:
+                title = album["title"]
+                artists = ", ".join([artist["name"] for artist in album["artists"]])
+                full_name = f"{artists} - {title}"
+                if len(full_name) > 48:
+                    full_name = full_name[:45] + "..."
+                print(f"{full_name:<50} {album['id']:<10}")
+
+        if "tracks" in result and result["tracks"]["results"]:
+            print("\nTRACKS:")
+            print(f"{'NAME':<50} {'ID':<10}")
+            print("-" * 60)
+            for track in result["tracks"]["results"]:
+                title = track["title"]
+                artists = ", ".join([artist["name"] for artist in track["artists"]])
+                full_name = f"{artists} - {title}"
+                if len(full_name) > 48:
+                    full_name = full_name[:45] + "..."
+                print(f"{full_name:<50} {track['id']:<10}")
 
     def get_album_info(self, album_id):
         print(f"[+] Getting album info for {album_id}...")
@@ -361,13 +412,23 @@ def settings():
     else:
         print("wrong choice")
 
+def search_menu(downloader):
+    query = input("Enter search query: ")
+    if not query:
+        print("Query cannot be empty")
+        return
+        
+    search_data = downloader.search(query)
+    if search_data:
+        downloader.format_search_results(search_data)
+
 def main():
     while True:
         print(BANNER)
         try:
             downloader = YandexMusicDownloader(
-                    oauth_token=token,
-                    download_dir=download_dir
+                oauth_token=token,
+                download_dir=download_dir
             )
             choice = int(input(">>> "))
             if choice == 0:
@@ -385,6 +446,8 @@ def main():
                     continue
                 downloader.process_track(track_id)
             elif choice == 3:
+                search_menu(downloader)
+            elif choice == 4:
                 settings()
             else:
                 print("wrong choice")
